@@ -82,7 +82,7 @@ CREATE OR REPLACE PACKAGE BODY PKG_TMS_AUDIT AS
 
 
         /* --------------------------------------------------------
-           Table name is stored in normalized form.
+           Table name is required.
            -------------------------------------------------------- */
 
         IF P_TABLE_NAME IS NULL THEN
@@ -94,6 +94,10 @@ CREATE OR REPLACE PACKAGE BODY PKG_TMS_AUDIT AS
 
         END IF;
 
+
+        /* --------------------------------------------------------
+           Primary-key value is required.
+           -------------------------------------------------------- */
 
         IF P_PK_VALUE IS NULL THEN
 
@@ -159,10 +163,8 @@ CREATE OR REPLACE PACKAGE BODY PKG_TMS_AUDIT AS
                     );
 
             EXCEPTION
-
                 WHEN OTHERS THEN
                     L_SESSION_ORG_ID := NULL;
-
             END;
 
         END IF;
@@ -192,6 +194,7 @@ CREATE OR REPLACE PACKAGE BODY PKG_TMS_AUDIT AS
             SYSTIMESTAMP,
             L_SESSION_ORG_ID
         );
+
 
         /*
            Deliberately no COMMIT here.
@@ -227,98 +230,120 @@ BEGIN
 END;
 /
 
+/* ================================================================
+   4. TICKET AUDIT
+   ================================================================ */
+
 CREATE OR REPLACE TRIGGER TRG_TMS_TICKETS_AUDIT
 AFTER INSERT OR UPDATE OR DELETE ON TMS_TICKETS
 FOR EACH ROW
+DECLARE
+    L_OLD_VALUE CLOB;
+    L_NEW_VALUE CLOB;
 BEGIN
 
     IF INSERTING THEN
+
+        SELECT JSON_OBJECT(
+                   'TICKET_ID' VALUE :NEW.TICKET_ID,
+                   'ORG_ID' VALUE :NEW.ORG_ID,
+                   'TICKET_REF' VALUE :NEW.TICKET_REF,
+                   'SUBJECT' VALUE :NEW.SUBJECT,
+                   'PRIORITY' VALUE :NEW.PRIORITY,
+                   'STATUS' VALUE :NEW.STATUS,
+                   'REQUESTER_USER_ID' VALUE :NEW.REQUESTER_USER_ID,
+                   'ASSIGNED_USER_ID' VALUE :NEW.ASSIGNED_USER_ID,
+                   'ASSIGNED_DEPARTMENT_ID' VALUE :NEW.ASSIGNED_DEPARTMENT_ID,
+                   'OPENED_DATE' VALUE :NEW.OPENED_DATE,
+                   'RESOLVED_DATE' VALUE :NEW.RESOLVED_DATE,
+                   'CLOSED_DATE' VALUE :NEW.CLOSED_DATE
+                   RETURNING CLOB
+               )
+        INTO L_NEW_VALUE
+        FROM DUAL;
 
         PKG_TMS_AUDIT.LOG_CHANGE(
             P_TABLE_NAME     => 'TMS_TICKETS',
             P_PK_VALUE       => TO_CHAR(:NEW.TICKET_ID),
             P_ACTION_TYPE    => 'INSERT',
             P_OLD_VALUE      => NULL,
-            P_NEW_VALUE      =>
-                JSON_OBJECT(
-                    'TICKET_ID' VALUE :NEW.TICKET_ID,
-                    'ORG_ID' VALUE :NEW.ORG_ID,
-                    'TICKET_REF' VALUE :NEW.TICKET_REF,
-                    'SUBJECT' VALUE :NEW.SUBJECT,
-                    'PRIORITY' VALUE :NEW.PRIORITY,
-                    'STATUS' VALUE :NEW.STATUS,
-                    'REQUESTER_USER_ID' VALUE :NEW.REQUESTER_USER_ID,
-                    'ASSIGNED_USER_ID' VALUE :NEW.ASSIGNED_USER_ID,
-                    'ASSIGNED_DEPARTMENT_ID' VALUE :NEW.ASSIGNED_DEPARTMENT_ID,
-                    'OPENED_DATE' VALUE :NEW.OPENED_DATE,
-                    'RESOLVED_DATE' VALUE :NEW.RESOLVED_DATE,
-                    'CLOSED_DATE' VALUE :NEW.CLOSED_DATE
-                    RETURNING CLOB
-                ),
+            P_NEW_VALUE      => L_NEW_VALUE,
             P_SESSION_ORG_ID => :NEW.ORG_ID
         );
 
 
     ELSIF UPDATING THEN
 
+        SELECT JSON_OBJECT(
+                   'TICKET_ID' VALUE :OLD.TICKET_ID,
+                   'ORG_ID' VALUE :OLD.ORG_ID,
+                   'TICKET_REF' VALUE :OLD.TICKET_REF,
+                   'SUBJECT' VALUE :OLD.SUBJECT,
+                   'PRIORITY' VALUE :OLD.PRIORITY,
+                   'STATUS' VALUE :OLD.STATUS,
+                   'REQUESTER_USER_ID' VALUE :OLD.REQUESTER_USER_ID,
+                   'ASSIGNED_USER_ID' VALUE :OLD.ASSIGNED_USER_ID,
+                   'ASSIGNED_DEPARTMENT_ID' VALUE :OLD.ASSIGNED_DEPARTMENT_ID,
+                   'OPENED_DATE' VALUE :OLD.OPENED_DATE,
+                   'RESOLVED_DATE' VALUE :OLD.RESOLVED_DATE,
+                   'CLOSED_DATE' VALUE :OLD.CLOSED_DATE
+                   RETURNING CLOB
+               )
+        INTO L_OLD_VALUE
+        FROM DUAL;
+
+
+        SELECT JSON_OBJECT(
+                   'TICKET_ID' VALUE :NEW.TICKET_ID,
+                   'ORG_ID' VALUE :NEW.ORG_ID,
+                   'TICKET_REF' VALUE :NEW.TICKET_REF,
+                   'SUBJECT' VALUE :NEW.SUBJECT,
+                   'PRIORITY' VALUE :NEW.PRIORITY,
+                   'STATUS' VALUE :NEW.STATUS,
+                   'REQUESTER_USER_ID' VALUE :NEW.REQUESTER_USER_ID,
+                   'ASSIGNED_USER_ID' VALUE :NEW.ASSIGNED_USER_ID,
+                   'ASSIGNED_DEPARTMENT_ID' VALUE :NEW.ASSIGNED_DEPARTMENT_ID,
+                   'OPENED_DATE' VALUE :NEW.OPENED_DATE,
+                   'RESOLVED_DATE' VALUE :NEW.RESOLVED_DATE,
+                   'CLOSED_DATE' VALUE :NEW.CLOSED_DATE
+                   RETURNING CLOB
+               )
+        INTO L_NEW_VALUE
+        FROM DUAL;
+
+
         PKG_TMS_AUDIT.LOG_CHANGE(
-            P_TABLE_NAME     => 'TMS_TICKETS',
-            P_PK_VALUE       => TO_CHAR(:NEW.TICKET_ID),
-            P_ACTION_TYPE    => 'UPDATE',
-            P_OLD_VALUE      =>
-                JSON_OBJECT(
-                    'TICKET_ID' VALUE :OLD.TICKET_ID,
-                    'ORG_ID' VALUE :OLD.ORG_ID,
-                    'TICKET_REF' VALUE :OLD.TICKET_REF,
-                    'SUBJECT' VALUE :OLD.SUBJECT,
-                    'PRIORITY' VALUE :OLD.PRIORITY,
-                    'STATUS' VALUE :OLD.STATUS,
-                    'REQUESTER_USER_ID' VALUE :OLD.REQUESTER_USER_ID,
-                    'ASSIGNED_USER_ID' VALUE :OLD.ASSIGNED_USER_ID,
-                    'ASSIGNED_DEPARTMENT_ID' VALUE :OLD.ASSIGNED_DEPARTMENT_ID,
-                    'OPENED_DATE' VALUE :OLD.OPENED_DATE,
-                    'RESOLVED_DATE' VALUE :OLD.RESOLVED_DATE,
-                    'CLOSED_DATE' VALUE :OLD.CLOSED_DATE
-                    RETURNING CLOB
-                ),
-            P_NEW_VALUE      =>
-                JSON_OBJECT(
-                    'TICKET_ID' VALUE :NEW.TICKET_ID,
-                    'ORG_ID' VALUE :NEW.ORG_ID,
-                    'TICKET_REF' VALUE :NEW.TICKET_REF,
-                    'SUBJECT' VALUE :NEW.SUBJECT,
-                    'PRIORITY' VALUE :NEW.PRIORITY,
-                    'STATUS' VALUE :NEW.STATUS,
-                    'REQUESTER_USER_ID' VALUE :NEW.REQUESTER_USER_ID,
-                    'ASSIGNED_USER_ID' VALUE :NEW.ASSIGNED_USER_ID,
-                    'ASSIGNED_DEPARTMENT_ID' VALUE :NEW.ASSIGNED_DEPARTMENT_ID,
-                    'OPENED_DATE' VALUE :NEW.OPENED_DATE,
-                    'RESOLVED_DATE' VALUE :NEW.RESOLVED_DATE,
-                    'CLOSED_DATE' VALUE :NEW.CLOSED_DATE
-                    RETURNING CLOB
-                ),
-            P_SESSION_ORG_ID => :NEW.ORG_ID
+            P_TABLE_NAME      => 'TMS_TICKETS',
+            P_PK_VALUE        => TO_CHAR(:NEW.TICKET_ID),
+            P_ACTION_TYPE     => 'UPDATE',
+            P_OLD_VALUE       => L_OLD_VALUE,
+            P_NEW_VALUE       => L_NEW_VALUE,
+            P_SESSION_ORG_ID  => :NEW.ORG_ID
         );
 
 
     ELSIF DELETING THEN
 
+        SELECT JSON_OBJECT(
+                   'TICKET_ID' VALUE :OLD.TICKET_ID,
+                   'ORG_ID' VALUE :OLD.ORG_ID,
+                   'TICKET_REF' VALUE :OLD.TICKET_REF,
+                   'SUBJECT' VALUE :OLD.SUBJECT,
+                   'PRIORITY' VALUE :OLD.PRIORITY,
+                   'STATUS' VALUE :OLD.STATUS
+                   RETURNING CLOB
+               )
+        INTO L_OLD_VALUE
+        FROM DUAL;
+
+
         PKG_TMS_AUDIT.LOG_CHANGE(
-            P_TABLE_NAME     => 'TMS_TICKETS',
-            P_PK_VALUE       => TO_CHAR(:OLD.TICKET_ID),
-            P_ACTION_TYPE    => 'DELETE',
-            P_OLD_VALUE      =>
-                JSON_OBJECT(
-                    'TICKET_ID' VALUE :OLD.TICKET_ID,
-                    'ORG_ID' VALUE :OLD.ORG_ID,
-                    'TICKET_REF' VALUE :OLD.TICKET_REF,
-                    'SUBJECT' VALUE :OLD.SUBJECT,
-                    'PRIORITY' VALUE :OLD.PRIORITY,
-                    'STATUS' VALUE :OLD.STATUS
-                    RETURNING CLOB
-                ),
-            P_NEW_VALUE      => NULL,
-            P_SESSION_ORG_ID => :OLD.ORG_ID
+            P_TABLE_NAME      => 'TMS_TICKETS',
+            P_PK_VALUE        => TO_CHAR(:OLD.TICKET_ID),
+            P_ACTION_TYPE     => 'DELETE',
+            P_OLD_VALUE       => L_OLD_VALUE,
+            P_NEW_VALUE       => NULL,
+            P_SESSION_ORG_ID  => :OLD.ORG_ID
         );
 
     END IF;
@@ -327,54 +352,94 @@ END;
 /
 
 /* ================================================================
-   TICKET DETAILS
+   5. TICKET DETAILS
    ================================================================ */
 
 CREATE OR REPLACE TRIGGER TRG_TMS_TICKET_DETAILS_AUDIT
 AFTER INSERT OR UPDATE OR DELETE ON TMS_TICKET_DETAILS
 FOR EACH ROW
+DECLARE
+    L_OLD_VALUE CLOB;
+    L_NEW_VALUE CLOB;
 BEGIN
 
-    IF INSERTING OR UPDATING THEN
+    IF INSERTING THEN
+
+        SELECT JSON_OBJECT(
+                   'TICKET_DETAIL_ID' VALUE :NEW.TICKET_DETAIL_ID,
+                   'TICKET_ID' VALUE :NEW.TICKET_ID,
+                   'ORG_ID' VALUE :NEW.ORG_ID,
+                   'DETAIL_JSON' VALUE :NEW.DETAIL_JSON
+                   RETURNING CLOB
+               )
+        INTO L_NEW_VALUE
+        FROM DUAL;
+
 
         PKG_TMS_AUDIT.LOG_CHANGE(
             'TMS_TICKET_DETAILS',
             TO_CHAR(:NEW.TICKET_DETAIL_ID),
-            CASE WHEN INSERTING THEN 'INSERT' ELSE 'UPDATE' END,
-            CASE
-                WHEN UPDATING THEN
-                    JSON_OBJECT(
-                        'TICKET_DETAIL_ID' VALUE :OLD.TICKET_DETAIL_ID,
-                        'TICKET_ID' VALUE :OLD.TICKET_ID,
-                        'ORG_ID' VALUE :OLD.ORG_ID,
-                        'DETAIL_JSON' VALUE :OLD.DETAIL_JSON
-                        RETURNING CLOB
-                    )
-            END,
-            JSON_OBJECT(
-                'TICKET_DETAIL_ID' VALUE :NEW.TICKET_DETAIL_ID,
-                'TICKET_ID' VALUE :NEW.TICKET_ID,
-                'ORG_ID' VALUE :NEW.ORG_ID,
-                'DETAIL_JSON' VALUE :NEW.DETAIL_JSON
-                RETURNING CLOB
-            ),
+            'INSERT',
+            NULL,
+            L_NEW_VALUE,
             NULL,
             :NEW.ORG_ID
         );
 
-    ELSE
+
+    ELSIF UPDATING THEN
+
+        SELECT JSON_OBJECT(
+                   'TICKET_DETAIL_ID' VALUE :OLD.TICKET_DETAIL_ID,
+                   'TICKET_ID' VALUE :OLD.TICKET_ID,
+                   'ORG_ID' VALUE :OLD.ORG_ID,
+                   'DETAIL_JSON' VALUE :OLD.DETAIL_JSON
+                   RETURNING CLOB
+               )
+        INTO L_OLD_VALUE
+        FROM DUAL;
+
+
+        SELECT JSON_OBJECT(
+                   'TICKET_DETAIL_ID' VALUE :NEW.TICKET_DETAIL_ID,
+                   'TICKET_ID' VALUE :NEW.TICKET_ID,
+                   'ORG_ID' VALUE :NEW.ORG_ID,
+                   'DETAIL_JSON' VALUE :NEW.DETAIL_JSON
+                   RETURNING CLOB
+               )
+        INTO L_NEW_VALUE
+        FROM DUAL;
+
+
+        PKG_TMS_AUDIT.LOG_CHANGE(
+            'TMS_TICKET_DETAILS',
+            TO_CHAR(:NEW.TICKET_DETAIL_ID),
+            'UPDATE',
+            L_OLD_VALUE,
+            L_NEW_VALUE,
+            NULL,
+            :NEW.ORG_ID
+        );
+
+
+    ELSIF DELETING THEN
+
+        SELECT JSON_OBJECT(
+                   'TICKET_DETAIL_ID' VALUE :OLD.TICKET_DETAIL_ID,
+                   'TICKET_ID' VALUE :OLD.TICKET_ID,
+                   'ORG_ID' VALUE :OLD.ORG_ID,
+                   'DETAIL_JSON' VALUE :OLD.DETAIL_JSON
+                   RETURNING CLOB
+               )
+        INTO L_OLD_VALUE
+        FROM DUAL;
+
 
         PKG_TMS_AUDIT.LOG_CHANGE(
             'TMS_TICKET_DETAILS',
             TO_CHAR(:OLD.TICKET_DETAIL_ID),
             'DELETE',
-            JSON_OBJECT(
-                'TICKET_DETAIL_ID' VALUE :OLD.TICKET_DETAIL_ID,
-                'TICKET_ID' VALUE :OLD.TICKET_ID,
-                'ORG_ID' VALUE :OLD.ORG_ID,
-                'DETAIL_JSON' VALUE :OLD.DETAIL_JSON
-                RETURNING CLOB
-            ),
+            L_OLD_VALUE,
             NULL,
             NULL,
             :OLD.ORG_ID
@@ -386,57 +451,98 @@ END;
 /
 
 /* ================================================================
-   TICKET COMMENTS
+   6. TICKET COMMENTS
    ================================================================ */
 
 CREATE OR REPLACE TRIGGER TRG_TMS_TICKET_COMMENTS_AUDIT
 AFTER INSERT OR UPDATE OR DELETE ON TMS_TICKET_COMMENTS
 FOR EACH ROW
+DECLARE
+    L_OLD_VALUE CLOB;
+    L_NEW_VALUE CLOB;
 BEGIN
 
-    IF INSERTING OR UPDATING THEN
+    IF INSERTING THEN
+
+        SELECT JSON_OBJECT(
+                   'COMMENT_ID' VALUE :NEW.COMMENT_ID,
+                   'TICKET_ID' VALUE :NEW.TICKET_ID,
+                   'ORG_ID' VALUE :NEW.ORG_ID,
+                   'COMMENT_TYPE' VALUE :NEW.COMMENT_TYPE,
+                   'COMMENT_TEXT' VALUE :NEW.COMMENT_TEXT
+                   RETURNING CLOB
+               )
+        INTO L_NEW_VALUE
+        FROM DUAL;
+
 
         PKG_TMS_AUDIT.LOG_CHANGE(
             'TMS_TICKET_COMMENTS',
             TO_CHAR(:NEW.COMMENT_ID),
-            CASE WHEN INSERTING THEN 'INSERT' ELSE 'UPDATE' END,
-            CASE
-                WHEN UPDATING THEN
-                    JSON_OBJECT(
-                        'COMMENT_ID' VALUE :OLD.COMMENT_ID,
-                        'TICKET_ID' VALUE :OLD.TICKET_ID,
-                        'ORG_ID' VALUE :OLD.ORG_ID,
-                        'COMMENT_TYPE' VALUE :OLD.COMMENT_TYPE,
-                        'COMMENT_TEXT' VALUE :OLD.COMMENT_TEXT
-                        RETURNING CLOB
-                    )
-            END,
-            JSON_OBJECT(
-                'COMMENT_ID' VALUE :NEW.COMMENT_ID,
-                'TICKET_ID' VALUE :NEW.TICKET_ID,
-                'ORG_ID' VALUE :NEW.ORG_ID,
-                'COMMENT_TYPE' VALUE :NEW.COMMENT_TYPE,
-                'COMMENT_TEXT' VALUE :NEW.COMMENT_TEXT
-                RETURNING CLOB
-            ),
+            'INSERT',
+            NULL,
+            L_NEW_VALUE,
             NULL,
             :NEW.ORG_ID
         );
 
-    ELSE
+
+    ELSIF UPDATING THEN
+
+        SELECT JSON_OBJECT(
+                   'COMMENT_ID' VALUE :OLD.COMMENT_ID,
+                   'TICKET_ID' VALUE :OLD.TICKET_ID,
+                   'ORG_ID' VALUE :OLD.ORG_ID,
+                   'COMMENT_TYPE' VALUE :OLD.COMMENT_TYPE,
+                   'COMMENT_TEXT' VALUE :OLD.COMMENT_TEXT
+                   RETURNING CLOB
+               )
+        INTO L_OLD_VALUE
+        FROM DUAL;
+
+
+        SELECT JSON_OBJECT(
+                   'COMMENT_ID' VALUE :NEW.COMMENT_ID,
+                   'TICKET_ID' VALUE :NEW.TICKET_ID,
+                   'ORG_ID' VALUE :NEW.ORG_ID,
+                   'COMMENT_TYPE' VALUE :NEW.COMMENT_TYPE,
+                   'COMMENT_TEXT' VALUE :NEW.COMMENT_TEXT
+                   RETURNING CLOB
+               )
+        INTO L_NEW_VALUE
+        FROM DUAL;
+
+
+        PKG_TMS_AUDIT.LOG_CHANGE(
+            'TMS_TICKET_COMMENTS',
+            TO_CHAR(:NEW.COMMENT_ID),
+            'UPDATE',
+            L_OLD_VALUE,
+            L_NEW_VALUE,
+            NULL,
+            :NEW.ORG_ID
+        );
+
+
+    ELSIF DELETING THEN
+
+        SELECT JSON_OBJECT(
+                   'COMMENT_ID' VALUE :OLD.COMMENT_ID,
+                   'TICKET_ID' VALUE :OLD.TICKET_ID,
+                   'ORG_ID' VALUE :OLD.ORG_ID,
+                   'COMMENT_TYPE' VALUE :OLD.COMMENT_TYPE,
+                   'COMMENT_TEXT' VALUE :OLD.COMMENT_TEXT
+                   RETURNING CLOB
+               )
+        INTO L_OLD_VALUE
+        FROM DUAL;
+
 
         PKG_TMS_AUDIT.LOG_CHANGE(
             'TMS_TICKET_COMMENTS',
             TO_CHAR(:OLD.COMMENT_ID),
             'DELETE',
-            JSON_OBJECT(
-                'COMMENT_ID' VALUE :OLD.COMMENT_ID,
-                'TICKET_ID' VALUE :OLD.TICKET_ID,
-                'ORG_ID' VALUE :OLD.ORG_ID,
-                'COMMENT_TYPE' VALUE :OLD.COMMENT_TYPE,
-                'COMMENT_TEXT' VALUE :OLD.COMMENT_TEXT
-                RETURNING CLOB
-            ),
+            L_OLD_VALUE,
             NULL,
             NULL,
             :OLD.ORG_ID
@@ -448,63 +554,106 @@ END;
 /
 
 /* ================================================================
-   TICKET ATTACHMENTS
+   7. TICKET ATTACHMENTS
    ================================================================ */
 
 CREATE OR REPLACE TRIGGER TRG_TMS_TICKET_ATTACHMENTS_AUDIT
 AFTER INSERT OR UPDATE OR DELETE ON TMS_TICKET_ATTACHMENTS
 FOR EACH ROW
+DECLARE
+    L_OLD_VALUE CLOB;
+    L_NEW_VALUE CLOB;
 BEGIN
 
-    IF INSERTING OR UPDATING THEN
+    IF INSERTING THEN
+
+        SELECT JSON_OBJECT(
+                   'ATTACHMENT_ID' VALUE :NEW.ATTACHMENT_ID,
+                   'TICKET_ID' VALUE :NEW.TICKET_ID,
+                   'ORG_ID' VALUE :NEW.ORG_ID,
+                   'FILE_NAME' VALUE :NEW.FILE_NAME,
+                   'MIME_TYPE' VALUE :NEW.MIME_TYPE,
+                   'FILE_SIZE' VALUE :NEW.FILE_SIZE,
+                   'STORAGE_REFERENCE' VALUE :NEW.STORAGE_REFERENCE
+                   RETURNING CLOB
+               )
+        INTO L_NEW_VALUE
+        FROM DUAL;
+
 
         PKG_TMS_AUDIT.LOG_CHANGE(
             'TMS_TICKET_ATTACHMENTS',
             TO_CHAR(:NEW.ATTACHMENT_ID),
-            CASE WHEN INSERTING THEN 'INSERT' ELSE 'UPDATE' END,
-            CASE
-                WHEN UPDATING THEN
-                    JSON_OBJECT(
-                        'ATTACHMENT_ID' VALUE :OLD.ATTACHMENT_ID,
-                        'TICKET_ID' VALUE :OLD.TICKET_ID,
-                        'ORG_ID' VALUE :OLD.ORG_ID,
-                        'FILE_NAME' VALUE :OLD.FILE_NAME,
-                        'MIME_TYPE' VALUE :OLD.MIME_TYPE,
-                        'FILE_SIZE' VALUE :OLD.FILE_SIZE,
-                        'STORAGE_REFERENCE' VALUE :OLD.STORAGE_REFERENCE
-                        RETURNING CLOB
-                    )
-            END,
-            JSON_OBJECT(
-                'ATTACHMENT_ID' VALUE :NEW.ATTACHMENT_ID,
-                'TICKET_ID' VALUE :NEW.TICKET_ID,
-                'ORG_ID' VALUE :NEW.ORG_ID,
-                'FILE_NAME' VALUE :NEW.FILE_NAME,
-                'MIME_TYPE' VALUE :NEW.MIME_TYPE,
-                'FILE_SIZE' VALUE :NEW.FILE_SIZE,
-                'STORAGE_REFERENCE' VALUE :NEW.STORAGE_REFERENCE
-                RETURNING CLOB
-            ),
+            'INSERT',
+            NULL,
+            L_NEW_VALUE,
             NULL,
             :NEW.ORG_ID
         );
 
-    ELSE
+
+    ELSIF UPDATING THEN
+
+        SELECT JSON_OBJECT(
+                   'ATTACHMENT_ID' VALUE :OLD.ATTACHMENT_ID,
+                   'TICKET_ID' VALUE :OLD.TICKET_ID,
+                   'ORG_ID' VALUE :OLD.ORG_ID,
+                   'FILE_NAME' VALUE :OLD.FILE_NAME,
+                   'MIME_TYPE' VALUE :OLD.MIME_TYPE,
+                   'FILE_SIZE' VALUE :OLD.FILE_SIZE,
+                   'STORAGE_REFERENCE' VALUE :OLD.STORAGE_REFERENCE
+                   RETURNING CLOB
+               )
+        INTO L_OLD_VALUE
+        FROM DUAL;
+
+
+        SELECT JSON_OBJECT(
+                   'ATTACHMENT_ID' VALUE :NEW.ATTACHMENT_ID,
+                   'TICKET_ID' VALUE :NEW.TICKET_ID,
+                   'ORG_ID' VALUE :NEW.ORG_ID,
+                   'FILE_NAME' VALUE :NEW.FILE_NAME,
+                   'MIME_TYPE' VALUE :NEW.MIME_TYPE,
+                   'FILE_SIZE' VALUE :NEW.FILE_SIZE,
+                   'STORAGE_REFERENCE' VALUE :NEW.STORAGE_REFERENCE
+                   RETURNING CLOB
+               )
+        INTO L_NEW_VALUE
+        FROM DUAL;
+
+
+        PKG_TMS_AUDIT.LOG_CHANGE(
+            'TMS_TICKET_ATTACHMENTS',
+            TO_CHAR(:NEW.ATTACHMENT_ID),
+            'UPDATE',
+            L_OLD_VALUE,
+            L_NEW_VALUE,
+            NULL,
+            :NEW.ORG_ID
+        );
+
+
+    ELSIF DELETING THEN
+
+        SELECT JSON_OBJECT(
+                   'ATTACHMENT_ID' VALUE :OLD.ATTACHMENT_ID,
+                   'TICKET_ID' VALUE :OLD.TICKET_ID,
+                   'ORG_ID' VALUE :OLD.ORG_ID,
+                   'FILE_NAME' VALUE :OLD.FILE_NAME,
+                   'MIME_TYPE' VALUE :OLD.MIME_TYPE,
+                   'FILE_SIZE' VALUE :OLD.FILE_SIZE,
+                   'STORAGE_REFERENCE' VALUE :OLD.STORAGE_REFERENCE
+                   RETURNING CLOB
+               )
+        INTO L_OLD_VALUE
+        FROM DUAL;
+
 
         PKG_TMS_AUDIT.LOG_CHANGE(
             'TMS_TICKET_ATTACHMENTS',
             TO_CHAR(:OLD.ATTACHMENT_ID),
             'DELETE',
-            JSON_OBJECT(
-                'ATTACHMENT_ID' VALUE :OLD.ATTACHMENT_ID,
-                'TICKET_ID' VALUE :OLD.TICKET_ID,
-                'ORG_ID' VALUE :OLD.ORG_ID,
-                'FILE_NAME' VALUE :OLD.FILE_NAME,
-                'MIME_TYPE' VALUE :OLD.MIME_TYPE,
-                'FILE_SIZE' VALUE :OLD.FILE_SIZE,
-                'STORAGE_REFERENCE' VALUE :OLD.STORAGE_REFERENCE
-                RETURNING CLOB
-            ),
+            L_OLD_VALUE,
             NULL,
             NULL,
             :OLD.ORG_ID
@@ -516,63 +665,106 @@ END;
 /
 
 /* ================================================================
-   TICKET HISTORY
+   8. TICKET HISTORY
    ================================================================ */
 
 CREATE OR REPLACE TRIGGER TRG_TMS_TICKET_HISTORY_AUDIT
 AFTER INSERT OR UPDATE OR DELETE ON TMS_TICKET_HISTORY
 FOR EACH ROW
+DECLARE
+    L_OLD_VALUE CLOB;
+    L_NEW_VALUE CLOB;
 BEGIN
 
-    IF INSERTING OR UPDATING THEN
+    IF INSERTING THEN
+
+        SELECT JSON_OBJECT(
+                   'HISTORY_ID' VALUE :NEW.HISTORY_ID,
+                   'TICKET_ID' VALUE :NEW.TICKET_ID,
+                   'ORG_ID' VALUE :NEW.ORG_ID,
+                   'OLD_STATUS' VALUE :NEW.OLD_STATUS,
+                   'NEW_STATUS' VALUE :NEW.NEW_STATUS,
+                   'ACTOR_USER_ID' VALUE :NEW.ACTOR_USER_ID,
+                   'COMMENT_TEXT' VALUE :NEW.COMMENT_TEXT
+                   RETURNING CLOB
+               )
+        INTO L_NEW_VALUE
+        FROM DUAL;
+
 
         PKG_TMS_AUDIT.LOG_CHANGE(
             'TMS_TICKET_HISTORY',
             TO_CHAR(:NEW.HISTORY_ID),
-            CASE WHEN INSERTING THEN 'INSERT' ELSE 'UPDATE' END,
-            CASE
-                WHEN UPDATING THEN
-                    JSON_OBJECT(
-                        'HISTORY_ID' VALUE :OLD.HISTORY_ID,
-                        'TICKET_ID' VALUE :OLD.TICKET_ID,
-                        'ORG_ID' VALUE :OLD.ORG_ID,
-                        'OLD_STATUS' VALUE :OLD.OLD_STATUS,
-                        'NEW_STATUS' VALUE :OLD.NEW_STATUS,
-                        'ACTOR_USER_ID' VALUE :OLD.ACTOR_USER_ID,
-                        'COMMENT_TEXT' VALUE :OLD.COMMENT_TEXT
-                        RETURNING CLOB
-                    )
-            END,
-            JSON_OBJECT(
-                'HISTORY_ID' VALUE :NEW.HISTORY_ID,
-                'TICKET_ID' VALUE :NEW.TICKET_ID,
-                'ORG_ID' VALUE :NEW.ORG_ID,
-                'OLD_STATUS' VALUE :NEW.OLD_STATUS,
-                'NEW_STATUS' VALUE :NEW.NEW_STATUS,
-                'ACTOR_USER_ID' VALUE :NEW.ACTOR_USER_ID,
-                'COMMENT_TEXT' VALUE :NEW.COMMENT_TEXT
-                RETURNING CLOB
-            ),
+            'INSERT',
+            NULL,
+            L_NEW_VALUE,
             NULL,
             :NEW.ORG_ID
         );
 
-    ELSE
+
+    ELSIF UPDATING THEN
+
+        SELECT JSON_OBJECT(
+                   'HISTORY_ID' VALUE :OLD.HISTORY_ID,
+                   'TICKET_ID' VALUE :OLD.TICKET_ID,
+                   'ORG_ID' VALUE :OLD.ORG_ID,
+                   'OLD_STATUS' VALUE :OLD.OLD_STATUS,
+                   'NEW_STATUS' VALUE :OLD.NEW_STATUS,
+                   'ACTOR_USER_ID' VALUE :OLD.ACTOR_USER_ID,
+                   'COMMENT_TEXT' VALUE :OLD.COMMENT_TEXT
+                   RETURNING CLOB
+               )
+        INTO L_OLD_VALUE
+        FROM DUAL;
+
+
+        SELECT JSON_OBJECT(
+                   'HISTORY_ID' VALUE :NEW.HISTORY_ID,
+                   'TICKET_ID' VALUE :NEW.TICKET_ID,
+                   'ORG_ID' VALUE :NEW.ORG_ID,
+                   'OLD_STATUS' VALUE :NEW.OLD_STATUS,
+                   'NEW_STATUS' VALUE :NEW.NEW_STATUS,
+                   'ACTOR_USER_ID' VALUE :NEW.ACTOR_USER_ID,
+                   'COMMENT_TEXT' VALUE :NEW.COMMENT_TEXT
+                   RETURNING CLOB
+               )
+        INTO L_NEW_VALUE
+        FROM DUAL;
+
+
+        PKG_TMS_AUDIT.LOG_CHANGE(
+            'TMS_TICKET_HISTORY',
+            TO_CHAR(:NEW.HISTORY_ID),
+            'UPDATE',
+            L_OLD_VALUE,
+            L_NEW_VALUE,
+            NULL,
+            :NEW.ORG_ID
+        );
+
+
+    ELSIF DELETING THEN
+
+        SELECT JSON_OBJECT(
+                   'HISTORY_ID' VALUE :OLD.HISTORY_ID,
+                   'TICKET_ID' VALUE :OLD.TICKET_ID,
+                   'ORG_ID' VALUE :OLD.ORG_ID,
+                   'OLD_STATUS' VALUE :OLD.OLD_STATUS,
+                   'NEW_STATUS' VALUE :OLD.NEW_STATUS,
+                   'ACTOR_USER_ID' VALUE :OLD.ACTOR_USER_ID,
+                   'COMMENT_TEXT' VALUE :OLD.COMMENT_TEXT
+                   RETURNING CLOB
+               )
+        INTO L_OLD_VALUE
+        FROM DUAL;
+
 
         PKG_TMS_AUDIT.LOG_CHANGE(
             'TMS_TICKET_HISTORY',
             TO_CHAR(:OLD.HISTORY_ID),
             'DELETE',
-            JSON_OBJECT(
-                'HISTORY_ID' VALUE :OLD.HISTORY_ID,
-                'TICKET_ID' VALUE :OLD.TICKET_ID,
-                'ORG_ID' VALUE :OLD.ORG_ID,
-                'OLD_STATUS' VALUE :OLD.OLD_STATUS,
-                'NEW_STATUS' VALUE :OLD.NEW_STATUS,
-                'ACTOR_USER_ID' VALUE :OLD.ACTOR_USER_ID,
-                'COMMENT_TEXT' VALUE :OLD.COMMENT_TEXT
-                RETURNING CLOB
-            ),
+            L_OLD_VALUE,
             NULL,
             NULL,
             :OLD.ORG_ID
@@ -584,54 +776,94 @@ END;
 /
 
 /* ================================================================
-   TICKET WATCHERS
+   9. TICKET WATCHERS
    ================================================================ */
 
 CREATE OR REPLACE TRIGGER TRG_TMS_TICKET_WATCHERS_AUDIT
 AFTER INSERT OR UPDATE OR DELETE ON TMS_TICKET_WATCHERS
 FOR EACH ROW
+DECLARE
+    L_OLD_VALUE CLOB;
+    L_NEW_VALUE CLOB;
 BEGIN
 
-    IF INSERTING OR UPDATING THEN
+    IF INSERTING THEN
+
+        SELECT JSON_OBJECT(
+                   'TICKET_WATCHER_ID' VALUE :NEW.TICKET_WATCHER_ID,
+                   'TICKET_ID' VALUE :NEW.TICKET_ID,
+                   'ORG_ID' VALUE :NEW.ORG_ID,
+                   'USER_ID' VALUE :NEW.USER_ID
+                   RETURNING CLOB
+               )
+        INTO L_NEW_VALUE
+        FROM DUAL;
+
 
         PKG_TMS_AUDIT.LOG_CHANGE(
             'TMS_TICKET_WATCHERS',
             TO_CHAR(:NEW.TICKET_WATCHER_ID),
-            CASE WHEN INSERTING THEN 'INSERT' ELSE 'UPDATE' END,
-            CASE
-                WHEN UPDATING THEN
-                    JSON_OBJECT(
-                        'TICKET_WATCHER_ID' VALUE :OLD.TICKET_WATCHER_ID,
-                        'TICKET_ID' VALUE :OLD.TICKET_ID,
-                        'ORG_ID' VALUE :OLD.ORG_ID,
-                        'USER_ID' VALUE :OLD.USER_ID
-                        RETURNING CLOB
-                    )
-            END,
-            JSON_OBJECT(
-                'TICKET_WATCHER_ID' VALUE :NEW.TICKET_WATCHER_ID,
-                'TICKET_ID' VALUE :NEW.TICKET_ID,
-                'ORG_ID' VALUE :NEW.ORG_ID,
-                'USER_ID' VALUE :NEW.USER_ID
-                RETURNING CLOB
-            ),
+            'INSERT',
+            NULL,
+            L_NEW_VALUE,
             NULL,
             :NEW.ORG_ID
         );
 
-    ELSE
+
+    ELSIF UPDATING THEN
+
+        SELECT JSON_OBJECT(
+                   'TICKET_WATCHER_ID' VALUE :OLD.TICKET_WATCHER_ID,
+                   'TICKET_ID' VALUE :OLD.TICKET_ID,
+                   'ORG_ID' VALUE :OLD.ORG_ID,
+                   'USER_ID' VALUE :OLD.USER_ID
+                   RETURNING CLOB
+               )
+        INTO L_OLD_VALUE
+        FROM DUAL;
+
+
+        SELECT JSON_OBJECT(
+                   'TICKET_WATCHER_ID' VALUE :NEW.TICKET_WATCHER_ID,
+                   'TICKET_ID' VALUE :NEW.TICKET_ID,
+                   'ORG_ID' VALUE :NEW.ORG_ID,
+                   'USER_ID' VALUE :NEW.USER_ID
+                   RETURNING CLOB
+               )
+        INTO L_NEW_VALUE
+        FROM DUAL;
+
+
+        PKG_TMS_AUDIT.LOG_CHANGE(
+            'TMS_TICKET_WATCHERS',
+            TO_CHAR(:NEW.TICKET_WATCHER_ID),
+            'UPDATE',
+            L_OLD_VALUE,
+            L_NEW_VALUE,
+            NULL,
+            :NEW.ORG_ID
+        );
+
+
+    ELSIF DELETING THEN
+
+        SELECT JSON_OBJECT(
+                   'TICKET_WATCHER_ID' VALUE :OLD.TICKET_WATCHER_ID,
+                   'TICKET_ID' VALUE :OLD.TICKET_ID,
+                   'ORG_ID' VALUE :OLD.ORG_ID,
+                   'USER_ID' VALUE :OLD.USER_ID
+                   RETURNING CLOB
+               )
+        INTO L_OLD_VALUE
+        FROM DUAL;
+
 
         PKG_TMS_AUDIT.LOG_CHANGE(
             'TMS_TICKET_WATCHERS',
             TO_CHAR(:OLD.TICKET_WATCHER_ID),
             'DELETE',
-            JSON_OBJECT(
-                'TICKET_WATCHER_ID' VALUE :OLD.TICKET_WATCHER_ID,
-                'TICKET_ID' VALUE :OLD.TICKET_ID,
-                'ORG_ID' VALUE :OLD.ORG_ID,
-                'USER_ID' VALUE :OLD.USER_ID
-                RETURNING CLOB
-            ),
+            L_OLD_VALUE,
             NULL,
             NULL,
             :OLD.ORG_ID
@@ -641,5 +873,3 @@ BEGIN
 
 END;
 /
-
-/* Modified*/
