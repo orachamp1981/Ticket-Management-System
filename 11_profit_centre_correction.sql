@@ -68,9 +68,9 @@ SELECT o.org_id,
   JOIN tms_profit_centres pc
     ON pc.profit_centre_id = o.profit_centre_id;
 
-COMMENT ON VIEW vw_tms_org_scope IS
+COMMENT ON TABLE vw_tms_org_scope IS
     'Resolves each Organization to its owning Profit Centre. Use this to extend PKG_TMS_DATA_ACCESS for Profit-Centre-wide Super User scope.';
-
+    
 -- ============================================================
 -- 7. COST CENTRE RECONCILIATION
 -- ============================================================
